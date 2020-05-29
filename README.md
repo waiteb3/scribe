@@ -18,12 +18,12 @@ I am not asking you to blindly trust a binary, so inspect and audit the code unt
 
 ### Install
 
+```bash
 make init
 make install
-scribe init
-make clean
+```
 
-Add this to your rc file (zshrc, etc)
+After running the install command, add this to your rc file (zshrc, bashrc, etc)
 ```
 source <( scribe init )
 ```
