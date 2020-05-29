@@ -6,7 +6,7 @@
 .PHONY: clean install
 
 install:
-	go-bindata -o src/data.go -ignore='.*\.(go|rs)$' src
+	go-bindata -o src/data.go -ignore='.*\.(go|rs)$$' src
 	go build -o /usr/local/bin/scribe src/*.go
 
 install-tty-debug:
