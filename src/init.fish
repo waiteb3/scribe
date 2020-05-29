@@ -4,7 +4,7 @@
 # Updated by Brandon Waite, May 28 2020
 
 function _scribe-recorder --on-event fish_preexec
-	scribe record $argv
+	_scribe-release
 end
 
 function _scribe-release

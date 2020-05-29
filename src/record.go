@@ -11,6 +11,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -39,6 +40,16 @@ func IndexCommandV1(ctx context.Context, record string, timestamp string) error 
 // sqlite replacement:
 // a cache last 10 commands for each
 func Record(ctx context.Context, fullCmd string) error {
+	// match whitespace not recording in bash/zsh/fish
+	if regexp.MustCompile(`^\s+`).Match([]byte(fullCmd)) {
+		return nil
+	}
+
+	if strings.TrimSpace(fullCmd) == "unset HISTFILE" {
+		fmt.Println("release")
+		return nil
+	}
+
 	timestamp := strconv.Itoa(int(now()))
 	// TODO session specific log search as well
 	if err := initDebug(); err != nil {

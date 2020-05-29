@@ -4,7 +4,10 @@
 # Updated by Brandon Waite, May 28 2020
 
 _scribe-recorder() {
-	scribe record "$1"
+	cmd=$( scribe record "$1" )
+	if [[ "$cmd" == "release" ]]; then
+		_scribe-release
+	fi
 }
 preexec_functions=(_scribe-recorder)
 _scribe-history() {
