@@ -2,7 +2,7 @@ Copyright (C) 2020 Brandon Waite - All rights reserved
 
 ## Scribe
 
-`scribe` is a tool that securely records you shell history and syncs it across multiple machines.
+`scribe` is a tool that securely records you shell history and syncs it across multiple machines. 
 
 Acquiring a license: Currently granted on request
 
@@ -15,7 +15,7 @@ Terms and conditions:
 - License and access to the software or associated services is not guaranteed to be permanent.
 
 Personal notes:
-I am not asking you to blindly trust a binary, so inspect and audit the code until your heart is content. That's why it's source available.
+I am not asking you to blindly trust a binary touching your shell and recording data, so you are permitted to audit the code since it is "source-available".
 
 ### Install
 
@@ -24,7 +24,33 @@ make init
 make install
 ```
 
-After running the install command, add this to your rc file (zshrc, bashrc, etc)
+After running the install command, add this to your rc file (`~/.zshrc`)
 ```
 source <( scribe init )
 ```
+
+### Roadmap
+
+Roadmap is subject to change at any time.
+
+High level:
+- [ ] Support most common shells
+  - [x] Zsh support (will be the only first-class shell for some time)
+  - [ ] Bash Support
+  - [ ] Fish Support
+- [ ] "Sessions" per terminal
+- [ ] Data sync across machines
+- [ ] Custom Configuration
+  - [ ] Optional search prompt
+  - [ ] Optional full-screen mode for reverse search (`ctrl+r`)
+  - [ ] Optional coloring (on/off)
+  - [ ] Custom color themes with defaults
+  - [ ] Feature toggles
+  - [ ] Enhancement to store historical files in your own file server (custom HTTP endpoint)
+- [ ] Signed/Checksumed release binaries
+  - [ ] GPG Signed commits
+  - [ ] Reproducable artifacts
+  - [ ] Linux binaries
+  - [ ] OSX binaries
+  - [ ] Latest build always published
+  - [ ] `upgrade` subcommand
