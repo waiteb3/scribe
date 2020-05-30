@@ -3,7 +3,7 @@
 #  Proprietary
 #  Updated by Brandon Waite, May 28 2020
 
-.PHONY: clean install
+.PHONY: rust
 
 install:
 	go-bindata -o src/data.go -ignore='.*\.(go|rs)$$' src
@@ -13,7 +13,7 @@ install-tty-debug:
 	go-bindata -o src/data.go src
 	go build -o /usr/local/bin/scribe -ldflags "-X main.TTYSleep=400ms" src/*.go
 
-clean:
+uninstall:
 	rm -r ~/.scribe
 
 init:

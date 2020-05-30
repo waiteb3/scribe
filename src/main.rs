@@ -3,163 +3,101 @@
 // Proprietary
 // Updated by Brandon Waite, May 28 2020
 
-//! This shows how an application can write on stderr
-//! instead of stdout, thus making it possible to
-//! the command API instead of the "old style" direct
-//! unbuffered API.
-//!
-//! This particular example is only suited to Unix
-//! for now.
-//!
-//! cargo run --example stderr
-
 mod data;
 
-use std::error;
-use std::fmt;
-use std::io::{stdout, stderr, Write};
+use libc::{c_ushort, ioctl, STDOUT_FILENO, TIOCGWINSZ};
+use std::io::{Read, Write/*, stdin, stdout, stderr, BufReader, BufWriter*/};
 
 use termion;
+use termion::{clear, color, cursor, style};
+// use termion::raw::IntoRawMode;
+use termion::cursor::{DetectCursorPos};
+use termion::event::Key;
+use termion::input::TermRead;
 
-// #[derive(Debug)]
-// enum ErrorKind {
-//     Crossterm(crossterm::ErrorKind),
-//     Scribe(ScribeError),
-//     Io(std::io::Error),
-// }
+fn run_app(init: (u16, u16), reader: &mut dyn Read, writer: &mut dyn Write) -> Option<String> {
+    let choices: [String; 8] = [
+        String::from("echo test"),
+        String::from("echo fail"),
+        String::from("echo feed"),
+        String::from("echo find"),
+        String::from("echo free"),
+        String::from("echo asdf"),
+        String::from("echo zxcv"),
+        String::from("echo really loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong"),
+    ];
 
-// type Result<T> = std::result::Result<T, ErrorKind>;
+    let mut query = String::new();
+    let mut current: Option<&String> = None;
 
-// macro_rules! impl_from {
-//     ($from:path, $to:expr) => {
-//         impl From<$from> for ErrorKind {
-//             fn from(e: $from) -> Self {
-//                 $to(e)
-//             }
-//         }
-//     };
-// }
+    let mut cur: usize = 0;
 
-// impl_from!(crossterm::ErrorKind, ErrorKind::Crossterm);
-// impl_from!(ScribeError, ErrorKind::Scribe);
-// impl_from!(std::io::Error, ErrorKind::Io);
+    let mut input = reader.keys();
+    let mut running = true;
 
-// #[derive(Debug, Clone)]
-// struct ScribeError {
-//     inner: String
-// }
+    // std::thread::sleep_ms(1000);
+    // write!(writer, "{}{}{}", cursor::Restore, cursor::Save, "I").unwrap();
+    // writer.flush().unwrap();
+    // std::thread::sleep_ms(1000);
+    // write!(writer, "{}", clear::CurrentLine).unwrap();
+    // writer.flush().unwrap();
+    // std::thread::sleep_ms(1000);
 
-// impl fmt::Display for ScribeError {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         write!(f, "invalid first item to double")
-//     }
-// }
+    while running {
+        write!(writer, "{}{}", cursor::Goto(init.0, init.1), clear::AfterCursor).unwrap();
+        write!(writer, "{}{}{}{}\n~ ", color::Fg(color::Green), "] ", style::Reset, query).unwrap();
 
-// // This is important for other errors to wrap this one.
-// impl error::Error for ScribeError {
-//     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-//         // Generic error, underlying cause isn't tracked.
-//         None
-//     }
-// }
+        current = choices.iter().find(|c| query.len() > 0 && c.contains(&query));
 
-// const MATCHES: [&str; 8] = [
-//     "echo test",
-//     "echo fail",
-//     "echo feed",
-//     "echo find",
-//     "echo free",
-//     "echo asdf",
-//     "echo zxcv",
-//     "echo qwer",
-// ];
+        if let Some(m) = current {
+            write!(writer, "{}", m).unwrap();
+        } else {
+            write!(writer, "{}{}{}", color::Fg(color::LightBlack), "<no match>", style::Reset).unwrap();
+        }
 
-fn run_app(writer: &mut Write) -> Option<String> {
+        writer.flush().unwrap();
 
+        let next = input.next().unwrap().unwrap();
+
+        match next {
+            Key::Char('\n') => {
+                running = false;
+            }
+            Key::Up if cur != 0 => {
+                cur -= 1;
+            }
+            Key::Down if cur != choices.len() - 1 => {
+                cur += 1;
+            }
+            Key::Char(c) => {
+                query.push(c);
+            }
+            Key::Backspace => {
+                if query.len() > 0 {
+                    query.remove(query.len() - 1);
+                }
+            }
+            _ => { }
+        };
+
+        write!(writer, "{}{}{}", clear::CurrentLine, cursor::Up(1), cursor::Left(0)).unwrap();
+    }
+
+    write!(writer, "{}{}", cursor::Restore, clear::AfterCursor).unwrap();
+
+    current.map(|s| s.clone())
 }
 
-// fn run_app(writer: &mut Write) -> Result<String>
-// {
-//     // queue!(
-//     //     writer,
-//     //     EnterAlternateScreen, // enter alternate screen
-//     //     Hide,                  // hide the cursor
-//     // )?;
+#[repr(C)]
+struct TermSize {
+    row: c_ushort,
+    col: c_ushort,
+    x: c_ushort,
+    y: c_ushort,
+}
 
-//     terminal::enable_raw_mode().unwrap();
+use std::os::unix::io::{ AsRawFd };
 
-//     let user_char = prompt_search(writer);
-
-//     terminal::disable_raw_mode().unwrap();
-
-//     // execute!(writer, Show, LeaveAlternateScreen)?; // restore the cursor and leave the alternate screen
-
-//     user_char
-// }
-
-// fn search(result: String) -> Result<Vec<String>> {
-//     let matches = MATCHES.to_vec()
-//         .iter()
-//         .map(|s| s.to_string())
-//         .filter(|s| s.contains(result.as_str()))
-//         .collect();
-
-//     Ok(matches)
-// }
-
-// fn prompt_search(writer: &mut Write) -> Result<String>
-// {
-//     let mut result = String::new();
-//     loop {
-//         let (x, y) = terminal::size()?;
-
-//         queue!(writer, cursor::SavePosition, Print(result.clone())).unwrap();
-
-//         let mut y = 1;
-//         let matches = search(result.clone()).unwrap();
-//         let first = matches.get(0).unwrap_or(&result).clone();
-//         for matched in matches.iter() {
-//             queue!(writer, cursor::MoveDown(1), cursor::MoveToColumn(0), Print(matched.to_string())).unwrap();
-//             y += 1;
-//         }
-//         writer.flush().unwrap();
-
-//         match event::read().unwrap() {
-//             Event::Key(KeyEvent { code: KeyCode::Esc, .. }) => {
-//                 return Ok(first);
-//             },
-//             Event::Key(KeyEvent { code: KeyCode::Char(_), modifiers: KeyModifiers::CONTROL }) => {
-//                 return Ok(first);
-//             },
-//             Event::Key(KeyEvent { code: KeyCode::Backspace, .. }) => {
-//                 if result.len() > 0 {
-//                     result.remove(result.len() - 1);
-//                 }
-//             },
-//             Event::Key(KeyEvent { code: KeyCode::Char(c), .. }) => {
-//                 result.push(c);
-//             },
-//             Event::Key(default) => {
-//                 queue!(writer, cursor::RestorePosition, terminal::Clear(terminal::ClearType::FromCursorDown), Print(format!("{:?}", default))).unwrap();
-//                 println!("{:?}", default);
-//                 return Ok(first);
-//             },
-//             Event::Mouse(default) => {
-//                 queue!(writer, cursor::RestorePosition, terminal::Clear(terminal::ClearType::FromCursorDown), Print(format!("{:?}", default))).unwrap();
-//                 println!("{:?}", default);
-//                 return Ok(first);
-//             },
-//             Event::Resize(x, y) => {
-//                 queue!(writer, cursor::RestorePosition, terminal::Clear(terminal::ClearType::FromCursorDown), Print(format!("Resized: ({}, {})", x, y))).unwrap();
-//                 println!("Resized: ({}, {})", x, y);
-//                 return Ok(first);
-//             },
-//         };
-//         writer.flush().unwrap();
-//     }
-// }
-
-// cargo run --example stderr
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.contains(&("init".to_string())) {
@@ -169,11 +107,24 @@ fn main() {
     if !args.contains(&("search".to_string())) {
         return;
     }
-    // let mut tty = std::fs::OpenOptions::new()
-    //     .read(true)
-    //     .write(true)
-    //     .open("/dev/tty").unwrap();
 
-    let response = run_app(&mut stderr()).unwrap();
-    println!("{}", response);
+    let mut tty = termion::get_tty().unwrap();
+    let mut stdin = tty.try_clone().unwrap();
+
+    let mut size: TermSize;
+    unsafe {
+        size = std::mem::zeroed();
+        let result = ioctl(tty.as_raw_fd(), TIOCGWINSZ.into(), &mut size as *mut _);
+        if result < -1 {
+            panic!(std::io::Error::last_os_error());
+        }
+    }
+
+    let initial_position = tty.cursor_pos().unwrap();
+    let response = run_app(initial_position, &mut stdin, &mut tty);
+    if let Some(response) = response {
+        println!("{}", response);
+    } else {
+        println!("{} {} {} {}", size.col, size.row, size.x, size.y);
+    }
 }

@@ -7,7 +7,7 @@ use std::fs;
 use std::io::Write;
 
 fn main() -> std::io::Result<()> {
-    let current = fs::read_to_string("src/data.rs")?;
+    let _current = fs::read_to_string("src/data.rs")?;
     let init_zsh = fs::read_to_string("src/init.zsh")?;
 
     let data = fs::File::create("src/data.rs")?;
