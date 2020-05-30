@@ -5,17 +5,31 @@
 
 mod data;
 
-use libc::{c_ushort, ioctl, STDOUT_FILENO, TIOCGWINSZ};
-use std::io::{Read, Write/*, stdin, stdout, stderr, BufReader, BufWriter*/};
+use libc::{c_ushort, ioctl, TIOCGWINSZ};
+use std::io::{Read, Write};
 
 use termion;
 use termion::{clear, color, cursor, style};
-// use termion::raw::IntoRawMode;
 use termion::cursor::{DetectCursorPos};
 use termion::event::Key;
 use termion::input::TermRead;
 
-fn run_app(init: (u16, u16), reader: &mut dyn Read, writer: &mut dyn Write) -> Option<String> {
+#[repr(C)]
+struct TermSize {
+    ws_row: c_ushort,
+    ws_col: c_ushort,
+    _ws_xpixel: c_ushort,
+    _ws_ypixel: c_ushort,
+}
+
+struct Position {
+    x: u16,
+    y: u16,
+}
+
+use std::os::unix::io::{ AsRawFd };
+
+fn run_app(tty: &mut std::fs::File, reader: &mut dyn Read, writer: &mut dyn Write) -> Option<String> {
     let choices: [String; 8] = [
         String::from("echo test"),
         String::from("echo fail"),
@@ -27,6 +41,9 @@ fn run_app(init: (u16, u16), reader: &mut dyn Read, writer: &mut dyn Write) -> O
         String::from("echo really loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong"),
     ];
 
+    let mut size: TermSize;
+    let mut init = tty.cursor_pos().map(|(x, y)| Position{x, y}).unwrap();
+
     let mut query = String::new();
     let mut current: Option<&String> = None;
 
@@ -35,17 +52,10 @@ fn run_app(init: (u16, u16), reader: &mut dyn Read, writer: &mut dyn Write) -> O
     let mut input = reader.keys();
     let mut running = true;
 
-    // std::thread::sleep_ms(1000);
-    // write!(writer, "{}{}{}", cursor::Restore, cursor::Save, "I").unwrap();
-    // writer.flush().unwrap();
-    // std::thread::sleep_ms(1000);
-    // write!(writer, "{}", clear::CurrentLine).unwrap();
-    // writer.flush().unwrap();
-    // std::thread::sleep_ms(1000);
-
+    let search_prefix = "~ ";
     while running {
-        write!(writer, "{}{}", cursor::Goto(init.0, init.1), clear::AfterCursor).unwrap();
-        write!(writer, "{}{}{}{}\n~ ", color::Fg(color::Green), "] ", style::Reset, query).unwrap();
+        write!(writer, "{}{}", cursor::Goto(init.x, init.y), clear::AfterCursor).unwrap();
+        write!(writer, "{}{}{}{}\n{}", color::Fg(color::Green), "] ", style::Reset, query, search_prefix).unwrap();
 
         current = choices.iter().find(|c| query.len() > 0 && c.contains(&query));
 
@@ -60,43 +70,52 @@ fn run_app(init: (u16, u16), reader: &mut dyn Read, writer: &mut dyn Write) -> O
         let next = input.next().unwrap().unwrap();
 
         match next {
-            Key::Char('\n') => {
+            Key::Right | Key::Left |
+            Key::Home | Key::End |
+            Key::Esc | Key::Char('\n') => {
                 running = false;
             }
-            Key::Up if cur != 0 => {
+            Key::Up | Key::PageUp if cur != 0 => {
                 cur -= 1;
             }
-            Key::Down if cur != choices.len() - 1 => {
+            Key::Down | Key::PageDown if cur != choices.len() - 1 => {
                 cur += 1;
             }
             Key::Char(c) => {
                 query.push(c);
             }
-            Key::Backspace => {
-                if query.len() > 0 {
-                    query.remove(query.len() - 1);
-                }
+            Key::Backspace if query.len() > 0 => {
+                query.remove(query.len() - 1);
             }
-            _ => { }
+            _ => { /* TODO */ }
         };
 
-        write!(writer, "{}{}{}", clear::CurrentLine, cursor::Up(1), cursor::Left(0)).unwrap();
+        // recalculate restore position if the window dimensions changed due to scrolling
+        unsafe {
+            size = std::mem::zeroed();
+            let result = ioctl(tty.as_raw_fd(), TIOCGWINSZ.into(), &mut size as *mut _);
+            if result < -1 {
+                panic!(std::io::Error::last_os_error());
+            }
+        }
+
+        if init.y == size.ws_row {
+            init.y = size.ws_row - 1;
+        }
+
+        if let Some(string) = current {
+            let rows = (string.len() + search_prefix.len()) as u16 / size.ws_col;
+            if rows + init.y >= size.ws_row {
+                init.y = size.ws_row - 1 - rows;
+            }
+        }
     }
 
-    write!(writer, "{}{}", cursor::Restore, clear::AfterCursor).unwrap();
+    write!(writer, "{}{}", cursor::Goto(init.x, init.y), clear::AfterCursor).unwrap();
+    writer.flush().unwrap();
 
     current.map(|s| s.clone())
 }
-
-#[repr(C)]
-struct TermSize {
-    row: c_ushort,
-    col: c_ushort,
-    x: c_ushort,
-    y: c_ushort,
-}
-
-use std::os::unix::io::{ AsRawFd };
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -109,22 +128,11 @@ fn main() {
     }
 
     let mut tty = termion::get_tty().unwrap();
-    let mut stdin = tty.try_clone().unwrap();
+    let mut reader = tty.try_clone().unwrap();
+    let mut writer = tty.try_clone().unwrap();
 
-    let mut size: TermSize;
-    unsafe {
-        size = std::mem::zeroed();
-        let result = ioctl(tty.as_raw_fd(), TIOCGWINSZ.into(), &mut size as *mut _);
-        if result < -1 {
-            panic!(std::io::Error::last_os_error());
-        }
-    }
-
-    let initial_position = tty.cursor_pos().unwrap();
-    let response = run_app(initial_position, &mut stdin, &mut tty);
+    let response = run_app(&mut tty, &mut reader, &mut writer);
     if let Some(response) = response {
         println!("{}", response);
-    } else {
-        println!("{} {} {} {}", size.col, size.row, size.x, size.y);
     }
 }
