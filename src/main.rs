@@ -3,14 +3,12 @@
 // Proprietary
 // Updated by Brandon Waite, May 28 2020
 
-mod data;
-
 use libc::{c_ushort, ioctl, TIOCGWINSZ};
 use std::io::{Read, Write};
 
 use termion;
 use termion::{clear, color, cursor, style};
-use termion::cursor::{DetectCursorPos};
+use termion::cursor::DetectCursorPos;
 use termion::event::Key;
 use termion::input::TermRead;
 
@@ -120,7 +118,16 @@ fn run_app(tty: &mut std::fs::File, reader: &mut dyn Read, writer: &mut dyn Writ
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.contains(&("init".to_string())) {
-        println!("{}", data::INIT_ZSH);
+        let shell = std::env::var("SHELL").unwrap().as_str().to_lowercase();
+        if shell.contains("zsh") {
+            println!("{}", include_str!("etc/init.zsh"));
+        } else if shell.contains("fish") {
+            println!("{}", include_str!("etc/init.fish"));
+        } else if shell.contains("bash") {
+            println!("{}", include_str!("etc/init.bash"));
+        } else {
+            panic!("Unknown shell '{}', did not match supported list", shell);
+        }
         return;
     }
     if !args.contains(&("search".to_string())) {
