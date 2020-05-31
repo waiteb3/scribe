@@ -3,4 +3,4 @@
 -- Proprietary
 -- Updated by Brandon Waite, May 28 2020
 
-CREATE TABLE history_v0 (command TEXT, timestamp DATETIME);
+CREATE TABLE history (command TEXT, timestamp DATETIME);
