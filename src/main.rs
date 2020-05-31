@@ -12,6 +12,9 @@ use termion::cursor::DetectCursorPos;
 use termion::event::Key;
 use termion::input::TermRead;
 
+use log::{info};
+mod debug;
+
 #[repr(C)]
 struct TermSize {
     ws_row: c_ushort,
@@ -116,6 +119,10 @@ fn run_app(tty: &mut std::fs::File, reader: &mut dyn Read, writer: &mut dyn Writ
 }
 
 fn main() {
+    debug::init().unwrap();
+
+    // info!("Test");
+
     let args: Vec<String> = std::env::args().collect();
     if args.contains(&("init".to_string())) {
         let shell = std::env::var("SHELL").unwrap().as_str().to_lowercase();
@@ -133,6 +140,7 @@ fn main() {
     if !args.contains(&("search".to_string())) {
         return;
     }
+    
 
     let mut tty = termion::get_tty().unwrap();
     let mut reader = tty.try_clone().unwrap();
