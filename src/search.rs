@@ -1,3 +1,5 @@
+use std::convert::From;
+
 use libc::{c_ushort, ioctl, TIOCGWINSZ};
 use std::io::{Read, Write};
 use std::os::unix::io::{ AsRawFd };
@@ -57,13 +59,23 @@ pub fn matches(cursor: & mut Cursor, query: String) -> Vec<String> {
         }
     }
 
-    
+
     choices.iter().filter(|c| c.contains(&query)).map(|c| c.clone()).collect()
 }
 
-pub fn interactive(tty: &mut std::fs::File, reader: &mut dyn Read, writer: &mut dyn Write) -> Option<String> {
+pub struct SearchError {
+    pub cause: String,
+}
+
+impl From<std::io::Error> for SearchError {
+    fn from(err: std::io::Error) -> Self {
+        SearchError { cause: format!("IO Error encountered: {}", err) }
+    }
+}
+
+pub fn interactive(tty: &mut std::fs::File, reader: &mut dyn Read, writer: &mut dyn Write) -> Result<Option<String>, SearchError> {
     let mut size: TermSize;
-    let mut init = tty.cursor_pos().map(|(x, y)| Position{x, y}).unwrap();
+    let mut init = tty.cursor_pos().map(|(x, y)| Position{x, y})?;
 
     let mut query = String::new();
     let mut current: Option<String> = None;
@@ -74,23 +86,25 @@ pub fn interactive(tty: &mut std::fs::File, reader: &mut dyn Read, writer: &mut 
 
     let search_prefix = "~ ";
     while running {
-        write!(writer, "{}{}", cursor::Goto(init.x, init.y), clear::AfterCursor).unwrap();
-        write!(writer, "{}{}{}{}\n{}", color::Fg(color::Green), "] ", style::Reset, query, search_prefix).unwrap();
+        write!(writer, "{}{}", cursor::Goto(init.x, init.y), clear::AfterCursor)?;
+        write!(writer, "{}{}{}{}\n{}", color::Fg(color::Green), "] ", style::Reset, query, search_prefix)?;
 
         let matches = matches(&mut cursor, query.clone());
         current = matches.get(0).map(|c| c.clone());
 
         if let Some(cmd_text) = current.take() {
-            write!(writer, "{}", cmd_text).unwrap();
+            write!(writer, "{}", cmd_text)?;
         } else {
-            write!(writer, "{}{}{}", color::Fg(color::LightBlack), "<no match>", style::Reset).unwrap();
+            write!(writer, "{}{}{}", color::Fg(color::LightBlack), "<no match>", style::Reset)?;
         }
 
-        writer.flush().unwrap();
+        writer.flush()?;
 
-        let next = input.next().unwrap().unwrap();
+        let next = input.next().ok_or(
+            SearchError{ cause: format!("Error occured while waiting on input") }
+        )?;
 
-        match next {
+        match next? {
             Key::Right | Key::Left |
             Key::Home | Key::End |
             Key::Esc | Key::Char('\n') => {
@@ -132,8 +146,8 @@ pub fn interactive(tty: &mut std::fs::File, reader: &mut dyn Read, writer: &mut 
         }
     }
 
-    write!(writer, "{}{}", cursor::Goto(init.x, init.y), clear::AfterCursor).unwrap();
-    writer.flush().unwrap();
+    write!(writer, "{}{}", cursor::Goto(init.x, init.y), clear::AfterCursor)?;
+    writer.flush()?;
 
-    current.map(|s| s.clone())
+    Ok(current.map(|s| s.clone()))
 }

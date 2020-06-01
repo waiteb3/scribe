@@ -20,22 +20,19 @@ impl log::Log for Logger {
         ).unwrap();
     }
 
-    fn flush(&self) { 
+    fn flush(&self) {
         self.stream.lock().unwrap().flush().unwrap();
      }
 }
 
-pub fn init() -> Result<(), SetLoggerError> {
-    let home = std::env::home_dir().unwrap();
-    let scribe_home = home.join(".scribe_next");
-    std::fs::create_dir_all(scribe_home).unwrap();
+pub fn init(home: std::path::PathBuf) -> Result<(), SetLoggerError> {
     let file = OpenOptions::new()
         .create(true)
         .append(true)
         .truncate(false)
         .open(home.join(".scribe_next").join("log"))
         .unwrap();
-    
+
     log::set_max_level(log::LevelFilter::Info);
     log::set_boxed_logger(Box::new(Logger{stream: Mutex::new(file)}))
 }

@@ -4,7 +4,7 @@ use std::fmt;
 
 #[derive(Debug)]
 pub struct InitError {
-    cause: String,
+    pub cause: String,
 }
 
 impl fmt::Display for InitError {
@@ -47,6 +47,19 @@ fn current_shell() -> Result<Shell, InitError> {
             cause: format!("'{}' is not a supported shell", shell),
         })
     }
+}
+
+pub fn scribe_dir() -> Result<std::path::PathBuf, InitError> {
+    let home = dirs::home_dir().ok_or(InitError{ cause: String::from("Unable to detect home dir, most likely $HOME is not set") })?;
+    Ok(home.join(".scribe_next"))
+}
+
+pub fn dirs() -> Vec<String> {
+    vec![
+        String::from("dir"),
+        String::from("log"),
+        String::from("history"),
+    ]
 }
 
 pub fn env_init() -> Result<(), InitError> {
