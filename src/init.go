@@ -67,9 +67,9 @@ func Init(ctx context.Context) error {
 	case "zsh":
 		if !alreadyExists {
 			// TODO #001# import only if init is ran with flag
-			// if err := importZshHistory(ctx, db); err != nil {
-			// 	return err
-			// }
+			if err := importZshHistory(ctx, db); err != nil {
+				return err
+			}
 		}
 
 		initScript, err = Asset("src/init.zsh")
