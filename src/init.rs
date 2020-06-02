@@ -56,7 +56,7 @@ pub fn scribe_dir() -> Result<std::path::PathBuf, InitError> {
 
 pub fn dirs() -> Vec<String> {
     vec![
-        String::from("dir"),
+        String::from("data"),
         String::from("log"),
         String::from("history"),
     ]

@@ -9,3 +9,5 @@ termion = "*"
 libc = "*"
 log = { version = "*", features = ["std"] }
 dirs = "*"
+rusqlite = { version = "*", features = ["bundled"] }
+base64 = "*"

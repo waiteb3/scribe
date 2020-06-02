@@ -5,7 +5,7 @@
 
 _scribe-recorder() {
 	cmd=$( scribe record "$1" )
-	if [[ "$cmd" == "release" ]]; then
+	if [[ "$cmd" == "release" || "$cmd" == "release-hooks" ]]; then
 		_scribe-release
 	fi
 }

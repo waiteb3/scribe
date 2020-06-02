@@ -5,12 +5,13 @@
 
 use std::convert::From;
 
+use log::info;
 use termion;
-use log::{info};
 
 mod debug;
 mod init;
 mod search;
+mod record;
 
 #[derive(Debug)]
 struct ScribeError {
@@ -43,27 +44,32 @@ impl From<init::InitError> for ScribeError {
     }
 }
 
+impl From<record::RecordError> for ScribeError {
+    fn from(err: record::RecordError) -> Self {
+        ScribeError{ text: format!("Failure occured during 'record' command: {}", err.cause) }
+    }
+}
+
 impl From<search::SearchError> for ScribeError {
     fn from(err: search::SearchError) -> Self {
         ScribeError{ text: format!("Failure occured during 'init' command: {}", err.cause) }
     }
 }
 
-
 fn init() -> Result<(), ScribeError> {
     for dir in init::dirs() {
-        std::fs::create_dir_all(init::scribe_dir()?.join(dir))?;
+        let path = init::scribe_dir()?.join(dir);
+        if !std::path::Path::exists(&path) {
+            std::fs::create_dir_all(path)?;
+        }
     }
 
     Ok(())
 }
 
-
 fn main() -> Result<(), ScribeError> {
     init()?;
     debug::init(init::scribe_dir()?)?;
-
-    // info!("Test");
 
     let args: Vec<String> = std::env::args().collect();
     let (_command, full_flags) = args.split_first().ok_or(ScribeError{
@@ -81,11 +87,23 @@ fn main() -> Result<(), ScribeError> {
 
     match subcommand.as_str() {
         "init" => {
-            init::env_init()?;
-            Ok(())
+            Ok(init::env_init()?)
         }
         "record" => {
-            Ok(())
+            let deps = record::init(init::scribe_dir()?)?;
+
+            let cmd = flags.join(" ");
+            match record::precheck(cmd.clone()) {
+                record::Precheck::Append => {
+                    Ok(record::append_history(deps, cmd)?)
+                }
+                record::Precheck::Skip => {
+                    Ok(())
+                }
+                record::Precheck::Unset => {
+                    Ok(println!("release-hooks"))
+                }
+            }
         }
         "search" if flags.len() == 0 => {
             Err(ScribeError{ text: format!("Search requires at least 1 argument") })
