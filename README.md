@@ -2,7 +2,7 @@ Copyright (C) 2020 Brandon Waite - All rights reserved
 
 ## Scribe
 
-`scribe` is a tool that securely records you shell history and syncs it across multiple machines. 
+`scribe` is a tool that securely records your shell history and syncs it across multiple machines. 
 
 Acquiring a license: Currently granted on request
 
@@ -38,6 +38,7 @@ High level:
   - [x] Zsh support (will be the only first-class shell for some time)
   - [ ] Bash Support
   - [ ] Fish Support
+- [ ] `note` subcommand
 - [ ] "Sessions" per terminal
 - [ ] Data sync across machines
 - [ ] Custom Configuration
