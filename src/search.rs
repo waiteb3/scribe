@@ -9,6 +9,9 @@ use termion::{clear, color, cursor, style};
 use termion::cursor::DetectCursorPos;
 use termion::event::Key;
 use termion::input::TermRead;
+use rusqlite::{self, named_params};
+
+use super::init::DataStores;
 
 #[repr(C)]
 struct TermSize {
@@ -23,44 +26,16 @@ struct Position {
     y: u16,
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum Direction {
-    Up,
-    Down,
+    Older,
+    Newer,
 }
 
+#[derive(Copy, Clone)]
 pub struct Cursor {
-    pub count: usize,
     pub direction: Direction,
-    // timestamp
-}
-
-pub fn matches(cursor: & mut Cursor, query: String) -> Vec<String> {
-    if query.len() == 0 {
-        return vec![];
-    }
-
-    let choices: [String; 8] = [
-        String::from("echo test"),
-        String::from("echo fail"),
-        String::from("echo feed"),
-        String::from("echo find"),
-        String::from("echo free"),
-        String::from("echo asdf"),
-        String::from("echo zxcv"),
-        String::from("echo really loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooong"),
-    ];
-
-    if cursor.count == 1 {
-        let choice = choices.iter().find(|c| c.contains(&query));
-        if let Some(choice) = choice {
-            return vec![choice.clone()];
-        } else {
-            return vec![];
-        }
-    }
-
-
-    choices.iter().filter(|c| c.contains(&query)).map(|c| c.clone()).collect()
+    pub oid: u32,
 }
 
 pub struct SearchError {
@@ -73,7 +48,107 @@ impl From<std::io::Error> for SearchError {
     }
 }
 
-pub fn interactive(tty: &mut std::fs::File, reader: &mut dyn Read, writer: &mut dyn Write) -> Result<Option<String>, SearchError> {
+impl From<rusqlite::Error> for SearchError {
+    fn from(err: rusqlite::Error) -> Self {
+        SearchError { cause: format!("SQL Error encountered: {}", err) }
+    }
+}
+
+fn row_to_result(prev: Cursor, row: &rusqlite::Row) -> Result<(String, Cursor), rusqlite::Error> {
+    let cmd = row.get::<_, String>(1)?;
+    let cursor = Cursor{
+        direction: prev.direction,
+        oid: row.get(0).unwrap_or(prev.oid),
+    };
+
+    Ok((cmd, cursor))
+}
+
+pub fn find_next_match(deps: DataStores, query: String, cursor: Cursor) -> Result<(Option<String>, Cursor), SearchError> {
+    if query.len() == 0 {
+        return Ok((None, cursor));
+    }
+
+    let result = match cursor.direction {
+        Direction::Older => {
+            deps.index.try_lock().unwrap().query_row_named(
+                r#"
+                    SELECT oid, command
+                    FROM history
+                    WHERE command LIKE '%' || :query || '%'
+                    AND oid <= :oid
+                    ORDER BY oid DESC
+                    LIMIT 1
+                "#,
+                named_params!{
+                    ":query": query,
+                    ":oid": cursor.oid,
+                },
+                 |row| row_to_result(cursor, row),
+            )
+        }
+        Direction::Newer => {
+            deps.index.try_lock().unwrap().query_row_named(
+                r#"
+                    SELECT oid, command
+                    FROM history
+                    WHERE command LIKE '%' || :query || '%'
+                    AND oid >= :oid
+                    ORDER BY oid ASC
+                    LIMIT 1
+                "#,
+                named_params! {
+                    ":query": query,
+                    ":oid": cursor.oid,
+                },
+                |row| row_to_result(cursor, row),
+            )
+        }
+    };
+
+    match result {
+        Ok((cmd, next)) => {
+            Ok((Some(cmd), next))
+        }
+        Err(rusqlite::Error::QueryReturnedNoRows) => {
+            Ok((None, cursor))
+        }
+        Err(e) => {
+            Err(e.into())
+        }
+    }
+}
+
+pub fn find_recent_matches(deps: DataStores, query: String) -> Result<Vec<String>, SearchError> {
+    if query.len() == 0 {
+        return Ok(vec![]);
+    }
+
+    let index = deps.index.try_lock().unwrap();
+    let mut statement = index.prepare(r#"
+        SELECT command
+        FROM history
+        WHERE command LIKE '%s' || :query || '%s'
+        LIMIT 20
+    "#)?;
+
+    let rows = statement.query_map_named(
+        named_params![
+            ":query": query,
+        ],
+        |row| {
+            Ok(row.get::<_, String>(0)?)
+        },
+    )?;
+
+    let mut choices = vec![];
+    for row in rows {
+        choices.push(row?);
+    }
+    Ok(choices)
+}
+
+pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn Read, writer: &mut dyn Write) -> Result<Option<String>, SearchError> {
     let mut size: TermSize;
     let mut init = tty.cursor_pos().map(|(x, y)| Position{x, y})?;
 
@@ -82,15 +157,18 @@ pub fn interactive(tty: &mut std::fs::File, reader: &mut dyn Read, writer: &mut 
 
     let mut input = reader.keys();
     let mut running = true;
-    let mut cursor = Cursor{ count: 1, direction: Direction::Up };
+    let mut cursor = Cursor{ direction: Direction::Older, oid: std::u32::MAX };
 
+    let prompt_prefix = "(scribe): ";
     let search_prefix = "~ ";
+
     while running {
         write!(writer, "{}{}", cursor::Goto(init.x, init.y), clear::AfterCursor)?;
-        write!(writer, "{}{}{}{}\n{}", color::Fg(color::Green), "] ", style::Reset, query, search_prefix)?;
+        write!(writer, "{}{}{}{}\n{}", color::Fg(color::Green), prompt_prefix, style::Reset, query, search_prefix)?;
 
-        let matches = matches(&mut cursor, query.clone());
-        current = matches.get(0).map(|c| c.clone());
+        let (result, next) = find_next_match(deps.clone(), query.clone(), cursor)?;
+        current = result;
+        cursor = next;
 
         if let Some(cmd_text) = current.take() {
             write!(writer, "{}", cmd_text)?;
@@ -107,14 +185,17 @@ pub fn interactive(tty: &mut std::fs::File, reader: &mut dyn Read, writer: &mut 
         match next? {
             Key::Right | Key::Left |
             Key::Home | Key::End |
-            Key::Esc | Key::Char('\n') => {
+            Key::Esc | Key::Ctrl('d') |
+            Key::Char('\n') => {
                 running = false;
             }
-            Key::Up | Key::PageUp => {
-                cursor.direction = Direction::Up;
+            Key::Up | Key::PageUp if cursor.oid > 0 => {
+                cursor.direction = Direction::Older;
+                cursor.oid -= 1;
             }
-            Key::Down | Key::PageDown => {
-                cursor.direction = Direction::Down;
+            Key::Down | Key::PageDown if cursor.oid < std::u32::MAX => {
+                cursor.direction = Direction::Newer;
+                cursor.oid += 1;
             }
             Key::Char(c) => {
                 query.push(c);

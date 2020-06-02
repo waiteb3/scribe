@@ -5,11 +5,10 @@
 
 use std::convert::From;
 
-use log::info;
 use termion;
 
-mod debug;
 mod init;
+mod debug;
 mod search;
 mod record;
 
@@ -56,19 +55,21 @@ impl From<search::SearchError> for ScribeError {
     }
 }
 
-fn init() -> Result<(), ScribeError> {
+fn init() -> Result<bool, ScribeError> {
+    let mut new = false;
     for dir in init::dirs() {
         let path = init::scribe_dir()?.join(dir);
         if !std::path::Path::exists(&path) {
+            new = true;
             std::fs::create_dir_all(path)?;
         }
     }
 
-    Ok(())
+    Ok(new)
 }
 
 fn main() -> Result<(), ScribeError> {
-    init()?;
+    let fresh = init()?;
     debug::init(init::scribe_dir()?)?;
 
     let args: Vec<String> = std::env::args().collect();
@@ -86,11 +87,16 @@ fn main() -> Result<(), ScribeError> {
     })?;
 
     match subcommand.as_str() {
-        "init" => {
+        // TODO split init into two cmds
+        "init" | "bind" => {
+            // if fresh {
+            //     let deps = init::deps(init::scribe_dir()?)?;
+            //     init::import_history(&deps)?;
+            // }
             Ok(init::env_init()?)
         }
         "record" => {
-            let deps = record::init(init::scribe_dir()?)?;
+            let deps = init::deps(init::scribe_dir()?)?;
 
             let cmd = flags.join(" ");
             match record::precheck(cmd.clone()) {
@@ -109,19 +115,20 @@ fn main() -> Result<(), ScribeError> {
             Err(ScribeError{ text: format!("Search requires at least 1 argument") })
         }
         "search" => {
+            let deps = init::deps(init::scribe_dir()?)?;
+
             let mut tty = termion::get_tty()?;
             let mut reader = tty.try_clone()?;
             let mut writer = tty.try_clone()?;
 
             // TODO separate subcommand
             if flags.get(0).unwrap() == &String::from("--interactive") {
-                let response = search::interactive(&mut tty, &mut reader, &mut writer)?;
+                let response = search::interactive(deps, &mut tty, &mut reader, &mut writer)?;
                 if let Some(response) = response {
                     println!("{}", response);
                 }
             } else {
-                let cursor = & mut search::Cursor{ count: 10, direction: search::Direction::Up };
-                let matches = search::matches(cursor, flags.join(" ").to_string());
+                let matches = search::find_recent_matches(deps, flags.join(" ").to_string())?;
                 for m in matches.iter() {
                     println!("{}", m);
                 }
