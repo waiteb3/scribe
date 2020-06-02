@@ -30,7 +30,7 @@ pub fn init(home: std::path::PathBuf) -> Result<(), SetLoggerError> {
         .create(true)
         .append(true)
         .truncate(false)
-        .open(home.join("log"))
+        .open(home.join("log").join("debug.log"))
         .unwrap();
 
     log::set_max_level(log::LevelFilter::Info);
