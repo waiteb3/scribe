@@ -201,6 +201,10 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
             Key::Char(c) => {
                 query.push(c);
             }
+            // TODO ctrl+a ctrl+e
+            Key::Ctrl('w') => {
+                query = String::new()
+            }
             Key::Backspace if query.len() > 0 => {
                 query.remove(query.len() - 1);
             }
