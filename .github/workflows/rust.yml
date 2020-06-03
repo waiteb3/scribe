@@ -12,15 +12,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Cache
-      uses: actions/cache@v2.0.0
+    - uses: actions/cache@v2.0.0
       with:
         # A list of files, directories, and wildcard patterns to cache and restore
         path: |
-          target/release/
+          target/release
           ~/.cargo/registry
+          ~/.cargo/git
         # An explicit key for restoring and saving the cache
-        key: ${{ hashFiles('Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: Build
       run: cargo build --verbose
     - name: Run tests
