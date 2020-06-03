@@ -176,6 +176,7 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
             write!(writer, "{}{}{}", color::Fg(color::LightBlack), "<no match>", style::Reset)?;
         }
 
+        write!(writer, "{}", cursor::Goto(init.x + (prompt_prefix.len() as u16) + (query.len() as u16), init.y))?;
         writer.flush()?;
 
         let next = input.next().ok_or(
