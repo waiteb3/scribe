@@ -170,7 +170,7 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
         current = result;
         cursor = next;
 
-        if let Some(cmd_text) = current.take() {
+        if let Some(cmd_text) = current.clone() {
             write!(writer, "{}", cmd_text)?;
         } else {
             write!(writer, "{}{}{}", color::Fg(color::LightBlack), "<no match>", style::Reset)?;
@@ -224,7 +224,7 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
             init.y = size.ws_row - 1;
         }
 
-        if let Some(cmd_text) = current.take() {
+        if let Some(cmd_text) = current.clone() {
             let rows = (cmd_text.len() + search_prefix.len()) as u16 / size.ws_col;
             if rows + init.y >= size.ws_row {
                 init.y = size.ws_row - 1 - rows;
