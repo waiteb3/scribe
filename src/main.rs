@@ -89,10 +89,10 @@ fn main() -> Result<(), ScribeError> {
     match subcommand.as_str() {
         // TODO split init into two cmds
         "init" | "bind" => {
-            // if fresh {
-            //     let deps = init::deps(init::scribe_dir()?)?;
-            //     init::import_history(&deps)?;
-            // }
+            if fresh {
+                let deps = init::deps(init::scribe_dir()?)?;
+                init::import_history(deps)?;
+            }
             Ok(init::env_init()?)
         }
         "record" => {
