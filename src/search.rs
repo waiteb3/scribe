@@ -208,7 +208,9 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
             Key::Backspace if query.len() > 0 => {
                 query.remove(query.len() - 1);
             }
-            _ => { /* TODO */ }
+            e => {
+                log::log!(log::Level::Debug, "input '{:?}' was ignored", e);
+            }
         };
 
         // recalculate restore position if the window dimensions changed due to scrolling

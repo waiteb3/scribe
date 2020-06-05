@@ -3,8 +3,4 @@
 #  Proprietary
 #  Updated by Brandon Waite, May 28 2020
 
-/.tests/
 /target/
-scribe
-test.db
-debug.log

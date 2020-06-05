@@ -68,6 +68,13 @@ fn init() -> Result<bool, ScribeError> {
     Ok(new)
 }
 
+const NAME: &'static str = env!("CARGO_PKG_NAME");
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+#[cfg(target_os = "macos")]
+const PLATFORM: &'static str = "darwin";
+#[cfg(target_os = "linux")]
+const PLATFORM: &'static str = "linux";
+
 fn main() -> Result<(), ScribeError> {
     let fresh = init()?;
     debug::init(init::scribe_dir()?)?;
@@ -87,6 +94,9 @@ fn main() -> Result<(), ScribeError> {
     })?;
 
     match subcommand.as_str() {
+        "version" => {
+            Ok(println!("{}-{}-v{}", NAME, PLATFORM, VERSION))
+        }
         // TODO split init into two cmds
         "init" | "bind" => {
             if fresh {

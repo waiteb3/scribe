@@ -20,7 +20,6 @@ I am not asking you to blindly trust a binary touching your shell and recording 
 ### Install
 
 ```bash
-make init
 make install
 ```
 
@@ -51,7 +50,7 @@ High level:
 - [ ] Signed/Checksumed release binaries
   - [ ] GPG Signed commits
   - [ ] Reproducable artifacts
-  - [ ] Linux binaries
-  - [ ] OSX binaries
+  - [x] Linux binaries
+  - [x] OSX binaries
   - [ ] Latest build always published
   - [ ] `upgrade` subcommand
