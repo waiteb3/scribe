@@ -2,10 +2,8 @@ name: Create Release
 
 on:
   push:
-    # Sequence of patterns matched against refs/tags
     tags:
-      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
-
+      - 'v*'
 jobs:
   create:
     runs-on: ubuntu-18.04
@@ -20,14 +18,27 @@ jobs:
           release_name: Release ${{ github.ref }}
           body: |
             Release ${{ github.ref }}
-          draft: false
-          prerelease: false
+          draft: true
+          prerelease: true
+      - run: |
+          echo "${{ steps.create_release.outputs.upload_url }}" > release-upload-url.txt
+      - uses: actions/upload-artifact@v2
+        with:
+          name: release-upload-url
+          path: release-upload-url.txt
   build-nix:
     runs-on: ubuntu-18.04
     needs: create
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+        with:
+          name: release-upload-url
+          path: release-upload-url.txt
+      - id: release_info
+        run: |
+          echo ::set-output name=upload_url::$(cat release-upload-url.txt/release-upload-url.txt)
       - name: Compile Binary
         run: cargo build --release
       - name: Upload Release Asset
@@ -36,28 +47,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          upload_url: ${{ steps.release_info.outputs.upload_url }}
           asset_path: target/release/scribe
           asset_name: scribe-linux
-          asset_content_type: application/binary
+          asset_content_type: binary/octet-stream
   build-osx:
     runs-on: macos-10.15
     needs: create
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body: |
-            Release ${{ github.ref }}
-          draft: false
-          prerelease: false
+          name: release-upload-url
+          path: release-upload-url.txt
+      - id: release_info
+        run: |
+          echo ::set-output name=upload_url::$(cat release-upload-url.txt/release-upload-url.txt)
       - name: Compile Binary
         run: cargo build --release
       - name: Upload Release Asset
@@ -66,7 +72,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          upload_url: ${{ steps.release_info.outputs.upload_url }}
           asset_path: target/release/scribe
           asset_name: scribe-darwin
-          asset_content_type: application/binary
+          asset_content_type: binary/octet-stream
