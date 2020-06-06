@@ -162,6 +162,7 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
     let prompt_prefix = "(scribe): ";
     let search_prefix = "~ ";
 
+    let max_width = 500;
     while running {
         write!(writer, "{}{}", cursor::Goto(init.x, init.y), clear::AfterCursor)?;
         write!(writer, "{}{}{}{}\n{}", color::Fg(color::Green), prompt_prefix, style::Reset, query, search_prefix)?;
@@ -170,7 +171,15 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
         current = result;
         cursor = next;
 
-        if let Some(cmd_text) = current.clone() {
+        let rendered_text = current.clone().map(|cmd| {
+            if cmd.len() >= max_width {
+                format!("{}...", cmd.get(0..max_width).unwrap())
+            } else {
+                cmd
+            }
+        });
+
+        if let Some(cmd_text) = rendered_text.clone() {
             write!(writer, "{}", cmd_text)?;
         } else {
             write!(writer, "{}{}{}", color::Fg(color::LightBlack), "<no match>", style::Reset)?;
@@ -184,6 +193,9 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
         )?;
 
         match next? {
+            // Key::Right if truncated && current.is_some() => {
+            //     // TODO split out render & wait calls
+            // }
             Key::Right | Key::Left |
             Key::Home | Key::End |
             Key::Esc | Key::Ctrl('d') |
@@ -226,10 +238,17 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
             init.y = size.ws_row - 1;
         }
 
-        if let Some(cmd_text) = current.clone() {
-            let rows = (cmd_text.len() + search_prefix.len()) as u16 / size.ws_col;
+        if let Some(cmd_text) = rendered_text.clone() {
+            let mut combined = search_prefix.to_owned();
+            combined.push_str(cmd_text.as_str());
+
+            let mut rows: u16 = 0;
+            for line in combined.split('\n') {
+                rows += 1;
+                rows += line.len() as u16 / size.ws_col;
+            }
             if rows + init.y >= size.ws_row {
-                init.y = size.ws_row - 1 - rows;
+                init.y = size.ws_row - rows;
             }
         }
     }
