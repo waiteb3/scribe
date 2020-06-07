@@ -48,7 +48,7 @@ High level:
   - [ ] Feature toggles
   - [ ] Enhancement to store historical files in your own file server (custom HTTP endpoint)
 - [ ] Signed/Checksumed release binaries
-  - [ ] GPG Signed commits
+  - [x] GPG Signed commits
   - [ ] Reproducable artifacts
   - [x] Linux binaries
   - [x] OSX binaries
