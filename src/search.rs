@@ -35,7 +35,7 @@ pub enum Direction {
 #[derive(Copy, Clone)]
 pub struct Cursor {
     pub direction: Direction,
-    pub oid: u32,
+    pub oid: Option<u32>,
 }
 
 pub struct SearchError {
@@ -82,7 +82,7 @@ pub fn find_next_match(deps: DataStores, query: String, cursor: Cursor) -> Resul
                 "#,
                 named_params!{
                     ":query": query,
-                    ":oid": cursor.oid,
+                    ":oid": cursor.oid.unwrap_or(std::u32::MAX),
                 },
                  |row| row_to_result(cursor, row),
             )
@@ -99,7 +99,7 @@ pub fn find_next_match(deps: DataStores, query: String, cursor: Cursor) -> Resul
                 "#,
                 named_params! {
                     ":query": query,
-                    ":oid": cursor.oid,
+                    ":oid": cursor.oid.unwrap_or(0),
                 },
                 |row| row_to_result(cursor, row),
             )
@@ -157,7 +157,7 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
 
     let mut input = reader.keys();
     let mut running = true;
-    let mut cursor = Cursor{ direction: Direction::Older, oid: std::u32::MAX };
+    let mut cursor = Cursor{ direction: Direction::Older, oid: None };
 
     let prompt_prefix = "(scribe): ";
     let search_prefix = "~ ";
@@ -202,13 +202,18 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
             Key::Char('\n') => {
                 running = false;
             }
-            Key::Up | Key::PageUp if cursor.oid > 0 => {
+            Key::Up | Key::PageUp if cursor.oid.is_some() => {
                 cursor.direction = Direction::Older;
-                cursor.oid -= 1;
+                if let Some(oid) = cursor.oid {
+                    cursor.oid = Some(if oid > 0 { oid - 1 } else { 0 });
+                }
             }
-            Key::Down | Key::PageDown if cursor.oid < std::u32::MAX => {
+            Key::Down | Key::PageDown if cursor.oid.is_some() => {
                 cursor.direction = Direction::Newer;
-                cursor.oid += 1;
+                if let Some(oid) = cursor.oid {
+                    cursor.oid = Some(if oid < std::u32::MAX { oid + 1 } else { std::u32::MAX });
+                }
+
             }
             Key::Char(c) => {
                 query.push(c);
