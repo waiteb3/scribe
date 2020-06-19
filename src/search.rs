@@ -206,6 +206,7 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
                 current = None;
                 running = false;
             }
+            Key::Ctrl('r') | // SCRIBE-20: needs logic to handle highlighting & resuming from substring match
             Key::Up | Key::PageUp if cursor.oid.is_some() => {
                 cursor.direction = Direction::Older;
                 if let Some(oid) = cursor.oid {
@@ -217,7 +218,6 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
                 if let Some(oid) = cursor.oid {
                     cursor.oid = Some(if oid < std::u32::MAX { oid + 1 } else { std::u32::MAX });
                 }
-
             }
             Key::Char(c) => {
                 query.push(c);
