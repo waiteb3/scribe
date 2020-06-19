@@ -119,6 +119,7 @@ impl std::clone::Clone for DataStores {
 
 pub fn deps(home: std::path::PathBuf) -> Result<DataStores, InitError> {
     let index = rusqlite::Connection::open(home.join("data").join("index.db"))?;
+    index.execute_named("PRAGMA case_sensitive_like=ON", named_params! {})?;
 
     let latest = home.join("history").join("LATEST");
     let exists = latest.exists();

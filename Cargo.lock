@@ -236,7 +236,7 @@ dependencies = [
 
 [[package]]
 name = "scribe"
-version = "0.0.3"
+version = "0.0.3-preview"
 dependencies = [
  "base64",
  "dirs",

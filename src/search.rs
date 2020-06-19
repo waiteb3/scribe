@@ -128,7 +128,7 @@ pub fn find_recent_matches(deps: DataStores, query: String) -> Result<Vec<String
     let mut statement = index.prepare(r#"
         SELECT command
         FROM history
-        WHERE command LIKE '%s' || :query || '%s'
+        WHERE command LIKE '%' || :query || '%'
         LIMIT 20
     "#)?;
 
