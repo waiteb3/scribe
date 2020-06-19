@@ -2,7 +2,7 @@ Copyright (C) 2020 Brandon Waite - All rights reserved
 
 ## Scribe
 
-`scribe` is a tool that securely records your shell history and syncs it across multiple machines. 
+`scribe` is a tool that securely records your shell history and syncs it across multiple machines.
 
 Acquiring a license: Currently granted on request
 
@@ -25,7 +25,7 @@ make install
 
 After running the install command, add this to your rc file (`~/.zshrc`)
 ```
-source <( scribe init )
+source <( scribe bind )
 ```
 
 ### Roadmap
