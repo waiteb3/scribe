@@ -202,6 +202,10 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
             Key::Char('\n') => {
                 running = false;
             }
+            Key::Ctrl('u') => {
+                current = None;
+                running = false;
+            }
             Key::Up | Key::PageUp if cursor.oid.is_some() => {
                 cursor.direction = Direction::Older;
                 if let Some(oid) = cursor.oid {
