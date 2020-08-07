@@ -35,7 +35,8 @@ pub enum Direction {
 #[derive(Copy, Clone)]
 pub struct Cursor {
     pub direction: Direction,
-    pub oid: Option<u32>,
+    pub navigated: bool,
+    pub oid: u32,
 }
 
 pub struct SearchError {
@@ -58,6 +59,7 @@ fn row_to_result(prev: Cursor, row: &rusqlite::Row) -> Result<(String, Cursor), 
     let cmd = row.get::<_, String>(1)?;
     let cursor = Cursor{
         direction: prev.direction,
+        navigated: prev.navigated,
         oid: row.get(0).unwrap_or(prev.oid),
     };
 
@@ -82,9 +84,9 @@ pub fn find_next_match(deps: DataStores, query: String, cursor: Cursor) -> Resul
                 "#,
                 named_params!{
                     ":query": query,
-                    ":oid": cursor.oid.unwrap_or(std::u32::MAX),
+                    ":oid": if cursor.navigated { cursor.oid } else { std::u32::MAX },
                 },
-                 |row| row_to_result(cursor, row),
+                |row| row_to_result(cursor, row),
             )
         }
         Direction::Newer => {
@@ -99,7 +101,7 @@ pub fn find_next_match(deps: DataStores, query: String, cursor: Cursor) -> Resul
                 "#,
                 named_params! {
                     ":query": query,
-                    ":oid": cursor.oid.unwrap_or(0),
+                    ":oid": if cursor.navigated { cursor.oid } else { 0 },
                 },
                 |row| row_to_result(cursor, row),
             )
@@ -119,16 +121,17 @@ pub fn find_next_match(deps: DataStores, query: String, cursor: Cursor) -> Resul
     }
 }
 
-pub fn find_recent_matches(deps: DataStores, query: String) -> Result<Vec<String>, SearchError> {
+pub fn find_recent_matches(deps: DataStores, query: String) -> Result<Vec<(u32, String)>, SearchError> {
     if query.len() == 0 {
         return Ok(vec![]);
     }
 
     let index = deps.index.try_lock().unwrap();
     let mut statement = index.prepare(r#"
-        SELECT command
+        SELECT oid, command
         FROM history
         WHERE command LIKE '%' || :query || '%'
+        ORDER BY timestamp DESC
         LIMIT 20
     "#)?;
 
@@ -137,7 +140,10 @@ pub fn find_recent_matches(deps: DataStores, query: String) -> Result<Vec<String
             ":query": query,
         ],
         |row| {
-            Ok(row.get::<_, String>(0)?)
+            Ok((
+                row.get::<_, u32>(0)?,
+                row.get::<_, String>(1)?,
+            ))
         },
     )?;
 
@@ -145,6 +151,7 @@ pub fn find_recent_matches(deps: DataStores, query: String) -> Result<Vec<String
     for row in rows {
         choices.push(row?);
     }
+    choices.reverse();
     Ok(choices)
 }
 
@@ -157,7 +164,7 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
 
     let mut input = reader.keys();
     let mut running = true;
-    let mut cursor = Cursor{ direction: Direction::Older, oid: None };
+    let mut cursor = Cursor{ direction: Direction::Older, navigated: false, oid: std::u32::MAX };
 
     let prompt_prefix = "(scribe): ";
     let search_prefix = "~ ";
@@ -207,17 +214,15 @@ pub fn interactive(deps: DataStores, tty: &mut std::fs::File, reader: &mut dyn R
                 running = false;
             }
             Key::Ctrl('r') | // SCRIBE-20: needs logic to handle highlighting & resuming from substring match
-            Key::Up | Key::PageUp if cursor.oid.is_some() => {
+            Key::Up | Key::PageUp => {
                 cursor.direction = Direction::Older;
-                if let Some(oid) = cursor.oid {
-                    cursor.oid = Some(if oid > 0 { oid - 1 } else { 0 });
-                }
+                cursor.navigated = true;
+                cursor.oid = if cursor.oid > 0 { cursor.oid - 1 } else { 0 };
             }
-            Key::Down | Key::PageDown if cursor.oid.is_some() => {
+            Key::Down | Key::PageDown => {
                 cursor.direction = Direction::Newer;
-                if let Some(oid) = cursor.oid {
-                    cursor.oid = Some(if oid < std::u32::MAX { oid + 1 } else { std::u32::MAX });
-                }
+                cursor.navigated = true;
+                cursor.oid = if cursor.oid < std::u32::MAX { cursor.oid + 1 } else { std::u32::MAX };
             }
             Key::Char(c) => {
                 query.push(c);

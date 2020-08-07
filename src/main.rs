@@ -140,7 +140,7 @@ fn main() -> Result<(), ScribeError> {
             } else {
                 let matches = search::find_recent_matches(deps, flags.join(" ").to_string())?;
                 for m in matches.iter() {
-                    println!("{}", m);
+                    println!("{} {}", m.0, m.1);
                 }
             }
             Ok(())
