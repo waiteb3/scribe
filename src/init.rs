@@ -164,6 +164,7 @@ fn import_zsh_history(deps: DataStores) -> Result<(), InitError> {
     let history = std::fs::File::open(histfile)?;
     let reader = BufReader::new(history);
     for line in reader.lines() {
+        // : 1592664730:0;sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
         record::append_history(deps.clone(), line?).or_else(|e| Err(InitError{
             cause: format!("Unable to complete import from ZSH history: {}", e.cause)
         }))?;

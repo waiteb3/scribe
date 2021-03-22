@@ -3,21 +3,22 @@
 # Proprietary
 # Updated by Brandon Waite, May 28 2020
 
-_scribe-recorder() {
+function _scribe-recorder() {
     cmd=$( scribe record "$1" )
     if [[ "$cmd" == "release" || "$cmd" == "release-hooks" ]]; then
         _scribe-release
     fi
 }
 preexec_functions=(_scribe-recorder)
-_scribe-history() {
+function _scribe-history() {
     BUFFER=$(scribe search --interactive)
-    CURSOR=${#BUFFER}
+    CURSOR=$#BUFFER
+    zle -R -c
 }
 _SCRIBE_PREV_HISTORY_SEARCH=$(bindkey '^R' | cut -d' ' -f2)
 zle -N _scribe-history
 bindkey '^R' _scribe-history
-_scribe-release() {
+function _scribe-release() {
     args=$@
     if [ -z "$@" ]; then
         args="all"
